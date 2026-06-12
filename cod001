@@ -1,0 +1,275 @@
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from config import SENHA
+import openpyxl
+import time
+import pyautogui
+import pyperclip
+from pathlib import Path
+
+
+opcoes = Options()
+opcoes.add_argument("--incognito")
+
+driver = webdriver.Chrome(options=opcoes)
+driver.get("https://portalempresa-hml.sgusuite.com.br/login")
+
+time.sleep(3)
+
+USUARIO = "henio.fontes@unimedjf.coop.br"
+
+
+rotulo = driver.find_element(By.XPATH, "//*[contains(text(), 'Usuário') or contains(text(), 'usuário')]")
+campo_usuario = rotulo.find_element(By.XPATH, "./following::input[1]")
+campo_usuario.send_keys(USUARIO)
+
+rotulo_senha = driver.find_element(By.XPATH, "//*[contains(text(), 'Senha') or contains(text(), 'senha')]")
+campo_senha = rotulo_senha.find_element(By.XPATH, "./following::input[1]")
+campo_senha.send_keys(SENHA)
+
+print("⏸️ Selecione a Unimed manualmente...")
+input("👉 Selecione a Unimed Juiz de Fora e pressione Enter...")
+
+# ============================================
+# BLOCO DA UNIMED - COMENTADO ERRO
+# ============================================
+# try:
+#     dropdown = driver.find_element(By.CSS_SELECTOR, ".choices__inner")
+#     dropdown.click()
+#     time.sleep(1)
+#     opcao = driver.find_element(By.XPATH, "//*[contains(text(), 'Unimed Juiz de Fora')]")
+#     driver.execute_script("arguments[0].click();", opcao)
+#     print("✅ Unimed selecionada")
+# except Exception as e:
+#     print(f"⚠️ Erro: {e}")
+# ============================================
+
+botao = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
+driver.execute_script("arguments[0].click();", botao)
+print("✅ Login realizado!")
+
+time.sleep(3)
+
+# Menu Movimentar contrato
+try:
+    movimentar_contrato = driver.find_element(By.XPATH, "//a[contains(text(), 'Movimentar contrato')]")
+    driver.execute_script("arguments[0].click();", movimentar_contrato)
+    print("✅ Movimentar contrato - clicado")
+    time.sleep(2)
+except Exception as e:
+    print(f"❌ Erro: {e}")
+
+# Listar movimento
+try:
+    listar_movimento = driver.find_element(By.XPATH, "//a[contains(text(), 'Listar movimento')]")
+    driver.execute_script("arguments[0].click();", listar_movimento)
+    print("✅ Listar movimento - clicado")
+    time.sleep(2)
+except Exception as e:
+    print(f"❌ Erro: {e}")
+
+# Enter para avançar
+driver.find_element(By.TAG_NAME, 'body').send_keys(Keys.ENTER)
+print("✅ Enter pressionado - avançando")
+time.sleep(3)
+
+
+# Selecionar empresa
+def selecionar_empresa_combo(driver, codigo, combo_numero):
+    try:
+        dropdowns = driver.find_elements(By.CSS_SELECTOR, ".choices__inner")
+        dropdown = dropdowns[combo_numero - 1]
+        dropdown.click()
+        time.sleep(1)
+
+        opcao = driver.find_element(By.XPATH, f"//div[contains(text(), '{codigo}')]")
+        driver.execute_script("arguments[0].click();", opcao)
+        print(f"✅ Empresa {codigo} selecionada (combo {combo_numero})")
+        time.sleep(1)
+        return True
+    except Exception as e:
+        print(f"❌ Erro: {e}")
+        return False
+
+
+# Preencher movimento
+def preencher_movimento(driver, movimento):
+    try:
+        campo = driver.find_element(By.XPATH, "//input[@placeholder='Digite o Nome do Beneficiário ou Nº Movimento']")
+        campo.clear()
+        campo.send_keys(movimento)
+        print(f"✅ Movimento {movimento} - preenchido")
+        time.sleep(1)
+        campo.send_keys(Keys.ENTER)
+        print(f"✅ Enter pressionado")
+        time.sleep(2)
+        return True
+    except Exception as e:
+        print(f"❌ Erro ao preencher movimento: {e}")
+        return False
+
+
+# Clicar no botão editar
+def clicar_botao_editar(driver):
+    try:
+        botao_editar = driver.find_element(By.CSS_SELECTOR, "i.fa-edit")
+        driver.execute_script("arguments[0].click();", botao_editar)
+        print(f"✅ Botão de editar clicado")
+        time.sleep(2)
+        return True
+    except Exception as e:
+        print(f"❌ Erro ao clicar no botão editar: {e}")
+        return False
+
+
+# Buscar arquivos na pasta
+def buscar_arquivos_por_movimento(pasta, numero_movimento):
+    arquivos_encontrados = []
+    numero_movimento_str = str(numero_movimento)
+
+    for arquivo in Path(pasta).iterdir():
+        if arquivo.is_file() and arquivo.suffix.lower() == '.pdf':
+            nome_arquivo = arquivo.stem
+            if nome_arquivo.startswith(numero_movimento_str):
+                arquivos_encontrados.append(arquivo)
+                print(f"  📄 Encontrado: {arquivo.name}")
+
+    return arquivos_encontrados
+
+
+# Fazer upload automático
+def fazer_upload_auto(driver, caminho_arquivo):
+    try:
+        # Clica no botão "Selecionar"
+        botao_selecionar = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Selecionar')]"))
+        )
+        driver.execute_script("arguments[0].click();", botao_selecionar)
+        print(f"  ✅ Botão 'Selecionar' clicado")
+        time.sleep(2)
+
+        # Copia o caminho do arquivo para a área de transferência
+        caminho_completo = str(caminho_arquivo)
+        pyperclip.copy(caminho_completo)
+        print(f"  ✅ Caminho copiado: {caminho_arquivo.name}")
+        time.sleep(1)
+
+        # Cola o caminho (Ctrl+V)
+        pyautogui.hotkey('ctrl', 'v')
+        print(f"  ✅ Caminho colado")
+        time.sleep(1)
+
+        # Pressiona Enter para confirmar
+        pyautogui.press('enter')
+        print(f"  ✅ Enter pressionado - arquivo selecionado")
+        time.sleep(3)
+
+        # Voltar o foco para o navegador
+        driver.find_element(By.TAG_NAME, 'body').click()
+        time.sleep(1)
+
+        # Clicar no botão "Adicionar"
+        botao_adicionar = driver.find_element(By.XPATH, "//button[.//span[contains(text(), 'Adicionar')]]")
+        driver.execute_script("arguments[0].click();", botao_adicionar)
+        print(f"  ✅ Botão 'Adicionar' clicado - arquivo anexado")
+        time.sleep(2)
+        return True
+
+    except Exception as e:
+        print(f"  ❌ Erro no upload automático: {e}")
+        return False
+
+
+# VOLTAR PARA A TELA DE LISTA
+def voltar_para_lista(driver):
+    try:
+        botao_voltar = driver.find_element(By.XPATH, "//button[contains(text(), 'Voltar')]")
+        driver.execute_script("arguments[0].click();", botao_voltar)
+        print("✅ Botão 'Voltar' clicado")
+        time.sleep(2)
+        return True
+    except:
+        try:
+            botao_cancelar = driver.find_element(By.XPATH, "//button[contains(text(), 'Cancelar')]")
+            driver.execute_script("arguments[0].click();", botao_cancelar)
+            print("✅ Botão 'Cancelar' clicado")
+            time.sleep(2)
+            return True
+        except:
+            driver.back()
+            print("✅ Voltando via navegador")
+            time.sleep(2)
+            return True
+
+
+# ============================================
+# MAIN
+# ============================================
+pasta_chico = r"C:\chico"
+caminho_planilha = r"C:\chico\robo-chico.xlsx"
+
+planilha = openpyxl.load_workbook(caminho_planilha)
+aba = planilha.active
+
+# Mostrar todas as linhas que serão processadas
+print(f"\n📋 PLANILHA ENCONTRADA:")
+print(f"   Total de linhas: {aba.max_row - 1}")
+for linha_tmp in range(2, aba.max_row + 1):
+    codigo_tmp = str(aba.cell(row=linha_tmp, column=1).value)
+    movimento_tmp = aba.cell(row=linha_tmp, column=3).value
+    print(f"   Linha {linha_tmp - 1}: Código={codigo_tmp} | Movimento={movimento_tmp}")
+
+print(f"\n{'=' * 60}")
+print(f"Iniciando processamento na ordem da planilha...")
+print(f"{'=' * 60}\n")
+
+# Loop para cada linha da planilha (já está em ordem)
+for linha in range(2, aba.max_row + 1):
+    codigo = str(aba.cell(row=linha, column=1).value)
+    movimento = aba.cell(row=linha, column=3).value
+    nome = aba.cell(row=linha, column=2).value  # Coluna B
+
+    print(f"\n{'=' * 60}")
+    print(f"📌 PROCESSANDO LINHA {linha - 1} DA PLANILHA")
+    print(f"   Código Empresa: {codigo}")
+    print(f"   Nome: {nome}")
+    print(f"   Movimento: {movimento}")
+    print(f"{'=' * 60}")
+
+    # Preencher movimento
+    preencher_movimento(driver, movimento)
+
+    # Clicar editar
+    clicar_botao_editar(driver)
+
+    # Buscar arquivos na pasta
+    arquivos = buscar_arquivos_por_movimento(pasta_chico, movimento)
+    print(f"\n📁 Encontrados {len(arquivos)} arquivo(s) para o movimento {movimento}")
+
+    if len(arquivos) == 0:
+        print(f"⚠️ Nenhum arquivo encontrado, indo para próximo movimento...")
+        voltar_para_lista(driver)
+        continue
+
+    # Upload de cada arquivo
+    for i, arquivo in enumerate(arquivos):
+        print(f"\n📤 Enviando arquivo {i + 1}/{len(arquivos)}: {arquivo.name}")
+        fazer_upload_auto(driver, arquivo)
+        time.sleep(2)
+
+    # Voltar para a lista para processar o próximo movimento
+    print(f"\n🔙 Movimento {movimento} finalizado. Voltando para lista...")
+    voltar_para_lista(driver)
+
+    print(f"✅ Linha {linha - 1} concluída!")
+
+print("\n" + "=" * 60)
+print("✅ PROCESSAMENTO CONCLUÍDO! Todas as linhas da planilha foram processadas em ordem.")
+print("=" * 60)
+
+input("Pressione Enter para fechar...")
+driver.quit()
